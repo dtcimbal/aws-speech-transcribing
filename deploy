@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+stack_name=${PWD##*/}
+
+timestamp(){
+ date +"%Y-%m-%dT%T"
+}
+
+./package "$@"
+
+echo $(timestamp) Deploys the stack ${stack_name}
+
+aws cloudformation deploy \
+    --template-file Packaged.yml \
+    --stack-name ${stack_name} \
+    --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM

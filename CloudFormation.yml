@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The AWS CloudFormation template to transcribe speech with Lambda
+Parameters:
+  VoiceBucketName:
+    Description:      The S3 bucket name to hold voice file for further transcription
+    Type:             String
+    Default:          tweexy-voice
+  TranscriptionBucketName:
+    Description:      The S3 bucket name to hold the result transcription file
+    Type:             String
+    Default:          tweexy-transcriptions
+Resources:
+  VoiceBucket:
+    Type: AWS::S3::Bucket
+    DependsOn:
+    - TranscriptionLambdaFunction
+    Properties:
+      BucketName: !Ref VoiceBucketName
+      NotificationConfiguration:
+        LambdaConfigurations:
+        - Event: "s3:ObjectCreated:*"
+          Function: !GetAtt TranscriptionLambdaFunction.Arn
+
+  VoiceBucketNotificationPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref VoiceBucket
+      PolicyDocument:
+        Statement:
+        - Effect: "Allow"
+          Action:
+          - s3:PutBucketNotification
+          Resource: !GetAtt VoiceBucket.Arn
+          Principal:
+            AWS: !GetAtt TranscriptionExecutionRole.Arn
+
+  TranscriptionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt TranscriptionLambdaFunction.Arn
+      Principal: 's3.amazonaws.com'
+      # Direct Arn will create a cyclic reference
+      # SourceArn: !GetAtt VoiceBucket.Arn
+      SourceArn: !Sub 'arn:aws:s3:::${VoiceBucketName}'
+
+  TranscriptionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref TranscriptionBucketName
+  TranscriptionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: voice-transcription-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: log-voice-transcription-policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - !Sub >-
+              arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+      - PolicyName: s3-get-voice-transcription-policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource:
+            - !Sub >-
+              arn:aws:s3:::${VoiceBucketName}/*
+      - PolicyName: s3-put-voice-transcription-policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            Resource:
+            - !Sub >-
+              arn:aws:s3:::${TranscriptionBucketName}/*
+      - PolicyName: transcribes-policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - transcribe:GetTranscriptionJob
+            - transcribe:StartTranscriptionJob
+            - transcribe:CreateVocabulary
+            - transcribe:DeleteVocabulary
+            - transcribe:ListVocabularies
+            - transcribe:GetVocabulary
+            Resource: '*'
+      Path: /
+
+  TranscriptionLambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+    - TranscriptionExecutionRole
+    Properties:
+      Code: ./build
+      Handler: !Sub 'transcribe.handler'
+      MemorySize: 256
+      Role: !GetAtt TranscriptionExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 300
+      Environment:
+        Variables:
+          TRANSCRIPTION_BUCKET: !Ref TranscriptionBucketName
+

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Preserves deepest hierarchy level and drops file extension
+stack_name=${PWD##*/}
+
+timestamp(){
+ date +"%Y-%m-%dT%T"
+}
+
+echo ...
+echo $(timestamp) Deleting new stack ${stack_name}
+
+## Runs cloud formation
+aws cloudformation delete-stack \
+  --stack-name ${stack_name}
