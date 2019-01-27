@@ -1,4 +1,4 @@
-# Speech transcription
+# AWS Speech Transcribing
 The template defines 
 - Source and destination S3 buckets to handle source audio and transcription files
 - AWS Lambda function to administrate Amazon Transcribe service
