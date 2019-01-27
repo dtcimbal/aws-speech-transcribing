@@ -1,8 +1,6 @@
 import logging
-import os
-import random
 import re
-import string
+import os
 
 import awsutil
 import boto3
@@ -15,12 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 logger.info('Loading function')
 
-SUPPORTED_MEDIA_FORMATS = {
-    "flac": "",
-    "mp3": "",
-    "mp4": "",
-    "wav": ""
-}
+SUPPORTED_MEDIA_FORMATS = {"flac", "mp3", "mp4", "wav"}
 
 transcribe = boto3.client('transcribe', config=Config(retries={"max_attempts": 2}))
 
@@ -54,13 +47,9 @@ def raises_throttling_exception(decorable):
     return decorator
 
 
-# Generates a random ID for the transcribe function execution
-def __gen_id(size=8, chars=string.ascii_uppercase + string.digits):
-    return ''.join(random.choice(chars) for _ in range(size))
-
-
-@raises_throttling_exception
-def __start_transcription_job(source_url: str, source_format: str, to_bucket: str, lang='en-US'):
+# Throttling exception wrapper is optional
+# @raises_throttling_exception
+def __start_transcription_job(source_url: str, source_format: str, to_bucket: str, to_key: str, lang='en-US'):
     """
     Starts transcription job
 
@@ -70,11 +59,10 @@ def __start_transcription_job(source_url: str, source_format: str, to_bucket: st
     :param lang:
     :return:
     """
-    job_name = __gen_id()
 
     # Requests transcription job.
     response = transcribe.start_transcription_job(
-        TranscriptionJobName=job_name,
+        TranscriptionJobName=to_key,
         LanguageCode=lang,
         OutputBucketName=to_bucket,
         MediaFormat=source_format,
@@ -87,12 +75,13 @@ def __start_transcription_job(source_url: str, source_format: str, to_bucket: st
             'ChannelIdentification': False
         }
     )
-    return job_name
+
+    return response['TranscriptionJob']['TranscriptionJobName']
 
 
 def handler(event, context):
     # Gets ENV variables
-    transcription_bucket = os.environ['TRANSCRIPTION_BUCKET']
+    output_bucket = os.environ['TRANSCRIPTION_BUCKET']
 
     # Get the object from the event and show its content type
     (source_bucket, source_key) = awsutil.get_s3path(event)
@@ -103,9 +92,9 @@ def handler(event, context):
 
     logger.info("permitted media format: " + source_format)
     source_url = awsutil.build_s3url(bucket=source_bucket, key=source_key)
-    job_name = __start_transcription_job(source_url, source_format, transcription_bucket)
 
-    return {
-        "success": True,
-        "transcribeJob": job_name
-    }
+    # Formats the output key
+    output_key = re.sub(r'\s', '.', source_key)
+
+    # Starts transcription job
+    __start_transcription_job(source_url, source_format, output_bucket, output_key)

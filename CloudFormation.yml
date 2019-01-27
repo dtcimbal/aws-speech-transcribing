@@ -1,21 +1,22 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: The AWS CloudFormation template to transcribe speech with Lambda
+Description: The AWS CloudFormation template to transcribe speech with Lambda handler and AWS Transcribe
 Parameters:
   VoiceBucketName:
     Description:      The S3 bucket name to hold voice file for further transcription
     Type:             String
-    Default:          tweexy-voice
+    Default:          voice
   TranscriptionBucketName:
     Description:      The S3 bucket name to hold the result transcription file
     Type:             String
-    Default:          tweexy-transcriptions
+    Default:          transcriptions
 Resources:
+
   VoiceBucket:
     Type: AWS::S3::Bucket
     DependsOn:
     - TranscriptionLambdaFunction
     Properties:
-      BucketName: !Ref VoiceBucketName
+      BucketName: !Sub ${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}
       NotificationConfiguration:
         LambdaConfigurations:
         - Event: "s3:ObjectCreated:*"
@@ -37,17 +38,16 @@ Resources:
   TranscriptionLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      Action: 'lambda:InvokeFunction'
+      Action: lambda:InvokeFunction
       FunctionName: !GetAtt TranscriptionLambdaFunction.Arn
-      Principal: 's3.amazonaws.com'
-      # Direct Arn will create a cyclic reference
-      # SourceArn: !GetAtt VoiceBucket.Arn
-      SourceArn: !Sub 'arn:aws:s3:::${VoiceBucketName}'
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}
 
   TranscriptionBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref TranscriptionBucketName
+      BucketName: !Sub ${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}
+
   TranscriptionExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -66,7 +66,7 @@ Resources:
         PolicyDocument:
           Version: 2012-10-17
           Statement:
-          - Effect: "Allow"
+          - Effect: Allow
             Action:
             - logs:CreateLogGroup
             - logs:CreateLogStream
@@ -82,8 +82,7 @@ Resources:
             Action:
             - s3:GetObject
             Resource:
-            - !Sub >-
-              arn:aws:s3:::${VoiceBucketName}/*
+            - !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}/*
       - PolicyName: s3-put-voice-transcription-policy
         PolicyDocument:
           Version: 2012-10-17
@@ -92,8 +91,7 @@ Resources:
             Action:
             - s3:PutObject
             Resource:
-            - !Sub >-
-              arn:aws:s3:::${TranscriptionBucketName}/*
+            - !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}/*
       - PolicyName: transcribes-policy
         PolicyDocument:
           Version: 2012-10-17
@@ -122,5 +120,5 @@ Resources:
       Timeout: 300
       Environment:
         Variables:
-          TRANSCRIPTION_BUCKET: !Ref TranscriptionBucketName
+          TRANSCRIPTION_BUCKET: !Sub ${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}
 
