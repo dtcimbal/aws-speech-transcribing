@@ -4,11 +4,11 @@ Parameters:
   VoiceBucketName:
     Description:      The S3 bucket name to hold voice file for further transcription
     Type:             String
-    Default:          voice
+    Default:          speech-to-text-voice
   TranscriptionBucketName:
     Description:      The S3 bucket name to hold the result transcription file
     Type:             String
-    Default:          transcriptions
+    Default:          speech-to-text-transcriptions
 Resources:
 
   VoiceBucket:
@@ -16,7 +16,7 @@ Resources:
     DependsOn:
     - TranscriptionLambdaFunction
     Properties:
-      BucketName: !Sub ${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}
+      BucketName: !Sub ${AWS::AccountId}-${VoiceBucketName}
       NotificationConfiguration:
         LambdaConfigurations:
         - Event: "s3:ObjectCreated:*"
@@ -41,12 +41,12 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt TranscriptionLambdaFunction.Arn
       Principal: s3.amazonaws.com
-      SourceArn: !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}
+      SourceArn: !Sub arn:aws:s3:::${AWS::AccountId}-${VoiceBucketName}
 
   TranscriptionBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}
+      BucketName: !Sub ${AWS::AccountId}-${TranscriptionBucketName}
 
   TranscriptionExecutionRole:
     Type: AWS::IAM::Role
@@ -82,7 +82,7 @@ Resources:
             Action:
             - s3:GetObject
             Resource:
-            - !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${VoiceBucketName}/*
+            - !Sub arn:aws:s3:::${AWS::AccountId}-${VoiceBucketName}/*
       - PolicyName: s3-put-voice-transcription-policy
         PolicyDocument:
           Version: 2012-10-17
@@ -91,7 +91,7 @@ Resources:
             Action:
             - s3:PutObject
             Resource:
-            - !Sub arn:aws:s3:::${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}/*
+            - !Sub arn:aws:s3:::${AWS::AccountId}-${TranscriptionBucketName}/*
       - PolicyName: transcribes-policy
         PolicyDocument:
           Version: 2012-10-17
@@ -120,5 +120,5 @@ Resources:
       Timeout: 300
       Environment:
         Variables:
-          TRANSCRIPTION_BUCKET: !Sub ${AWS::AccountId}-${AWS::StackName}-${TranscriptionBucketName}
+          TRANSCRIPTION_BUCKET: !Sub ${AWS::AccountId}-${TranscriptionBucketName}
 
