@@ -1,20 +1,29 @@
 import logging
-import re
 import os
+import re
 
 import awsutil
 import boto3
 from botocore.config import Config
 
-# Log level
-logging.basicConfig()
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-
-logger.info('Loading function')
-
 SUPPORTED_MEDIA_FORMATS = {"flac", "mp3", "mp4", "wav"}
 
+# Logger setup
+formatter = logging.Formatter('%(asctime)-15s %(message)s')
+
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+
+# Console log handler
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+console.setFormatter(formatter)
+log.addHandler(console)
+
+log.info('Loading the handler')
+
+# AWS setup
+region = boto3.session.Session().region_name
 transcribe = boto3.client('transcribe', config=Config(retries={"max_attempts": 2}))
 
 
@@ -48,7 +57,7 @@ def raises_throttling_exception(decorable):
 
 
 # Throttling exception wrapper is optional
-# @raises_throttling_exception
+@raises_throttling_exception
 def __start_transcription_job(source_url: str, source_format: str, to_bucket: str, to_key: str, lang='en-US'):
     """
     Starts transcription job
@@ -90,7 +99,7 @@ def handler(event, context):
     if source_format not in SUPPORTED_MEDIA_FORMATS:
         raise UnsupportedMediaFormatError(f"{source_format} is not supported audio type.")
 
-    logger.info("permitted media format: " + source_format)
+    log.info("permitted media format: " + source_format)
     source_url = awsutil.build_s3url(bucket=source_bucket, key=source_key)
 
     # Formats the output key
