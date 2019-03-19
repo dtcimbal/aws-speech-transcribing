@@ -113,7 +113,7 @@ Resources:
     - TranscriptionExecutionRole
     Properties:
       Code: ./build
-      Handler: !Sub 'transcribe.handler'
+      Handler: !Sub 'index.handler'
       MemorySize: 256
       Role: !GetAtt TranscriptionExecutionRole.Arn
       Runtime: python3.7
